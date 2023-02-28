@@ -1,34 +1,62 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import './App.css'
+import { useState, useRef, useEffect } from "react";
+import { Button, Center, Text, VStack, HStack, Input } from "@chakra-ui/react";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const videoStream = useRef(null);
+  const remoteStream = useRef(null);
+
+  const options = {
+    audio: true,
+    video: true,
+  };
+
+  const getAccess = async () => {
+    await navigator.mediaDevices
+      .getUserMedia(options)
+      .then((stream) => {
+        videoStream.current.srcObject = stream;
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+  };
 
   return (
-    <div className="App">
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src="/vite.svg" className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </div>
-  )
+    <Center>
+      <VStack>
+        <Text fontSize="6xl">Welcome to WebRTC React</Text>
+        <HStack>
+          <Button onClick={() => getAccess()}>Get Media Devices</Button>
+        </HStack>
+        <HStack>
+          <video
+            style={{
+              width: "600px",
+              height: "600px",
+              border: "1px solid black",
+              borderRadius: "10px",
+              backgroundColor: "black",
+              margin: "10px",
+            }}
+            ref={videoStream}
+            autoPlay
+          />
+          <video
+            style={{
+              width: "600px",
+              height: "600px",
+              border: "1px solid black",
+              borderRadius: "10px",
+              backgroundColor: "black",
+              margin: "10px",
+            }}
+            ref={remoteStream}
+            autoPlay
+          />
+        </HStack>
+      </VStack>
+    </Center>
+  );
 }
 
-export default App
+export default App;
