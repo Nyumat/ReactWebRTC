@@ -17,9 +17,11 @@ function App() {
   const videoStream = useRef(null);
   const remoteStream = useRef(null);
   const peer = useRef(null);
-  const candiates = useRef([]);
-
   const textAreaRef = useRef(null);
+
+  const [hasOffer, setHasOffer] = useState(true);
+  const [hasAnswer, setHasAnswer] = useState(false);
+  const [status, setStatus] = useState("Not Connected");
 
   const options = {
     audio: false,
@@ -48,6 +50,8 @@ function App() {
     try {
       let sdp = await peer.current.createOffer(config);
       handleSDP(sdp);
+      setHasOffer(false);
+      setStatus("Calling...");
     } catch (err) {
       console.log(err);
     }
@@ -61,6 +65,8 @@ function App() {
     try {
       let sdp = await peer.current.createAnswer(config);
       handleSDP(sdp);
+      setHasAnswer(false);
+      setStatus("Call Accepted!");
     } catch (err) {
       console.log(err);
     }
@@ -87,7 +93,6 @@ function App() {
   const handleSDP = (sdp) => {
     peer.current.setLocalDescription(sdp);
     socket.emit("sdp", { sdp });
-
     sendToPeer("sdp", sdp);
   };
 
@@ -103,6 +108,14 @@ function App() {
     socket.on("sdp", (data) => {
       peer.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
       textAreaRef.current.value = JSON.stringify(data.sdp, null, 2);
+
+      if (data.sdp.type === "offer") {
+        setHasOffer(false);
+        setHasAnswer(true);
+        setStatus("Incoming Call...");
+      } else {
+        setStatus("Connected!");
+      }
     });
 
     socket.on("candidate", (candidate) => {
@@ -126,7 +139,7 @@ function App() {
 
     peerConnection.onicecandidate = (e) => {
       if (e.candidate) {
-        socket.emit("candidate", e.candidate);
+        sendToPeer("candidate", e.candidate);
       }
     };
 
@@ -159,6 +172,24 @@ function App() {
 
     peer.current = peerConnection;
   }, []);
+
+  const buttonToRender = () => {
+    if (hasOffer && !hasAnswer) {
+      return (
+        <Button onClick={() => createOffer()} colorScheme="blue">
+          Call
+        </Button>
+      );
+    }
+
+    if (!hasOffer && hasAnswer) {
+      return (
+        <Button onClick={() => createAnswer()} colorScheme="blue">
+          Answer
+        </Button>
+      );
+    }
+  };
 
   return (
     <Center>
@@ -194,14 +225,10 @@ function App() {
           />
         </HStack>
         <Input ref={textAreaRef} my={16} bg={"gray"} p={8} />
-        <HStack pt={12}>
-          <Button onClick={createOffer}>Create Offer</Button>
-          <Button onClick={createAnswer}>Create Answer</Button>
-        </HStack>
-        {/* <HStack pb={16}>
-          <Button onClick={addCandidate}>Add Candidates</Button>
-          <Button onClick={setRemoteDescription}>Set Remote Description</Button>
-        </HStack> */}
+        <VStack pt={12}>
+          {buttonToRender()}
+          <Text fontSize="2xl">{status}</Text>
+        </VStack>
       </VStack>
     </Center>
   );

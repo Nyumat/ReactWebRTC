@@ -24,4 +24,6 @@ io.on("connection", function (socket) {
   socket.on("candidate", (data) => {
     socket.broadcast.emit("candidate", data);
   });
+
+  socket.emit("connection", null);
 });
