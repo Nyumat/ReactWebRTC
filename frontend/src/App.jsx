@@ -47,9 +47,7 @@ function App() {
     };
     try {
       let sdp = await peer.current.createOffer(config);
-      peer.current.setLocalDescription(sdp);
-
-      socket.emit("sdp", { sdp });
+      handleSDP(sdp);
     } catch (err) {
       console.log(err);
     }
@@ -62,30 +60,39 @@ function App() {
     };
     try {
       let sdp = await peer.current.createAnswer(config);
-      peer.current.setLocalDescription(sdp);
-
-      socket.emit("sdp", { sdp });
+      handleSDP(sdp);
     } catch (err) {
       console.log(err);
     }
   };
 
-  const setRemoteDescription = async () => {
-    const remoteDescription = JSON.parse(textAreaRef.current.value);
-    peer.current
-      .setRemoteDescription(new RTCSessionDescription(remoteDescription))
-      .then(() => {
-        console.log("Remote Description Set");
-      })
-      .catch((err) => {
-        console.log(err);
-      });
+  // const setRemoteDescription = async () => {
+  //   const remoteDescription = JSON.parse(textAreaRef.current.value);
+  //   peer.current
+  //     .setRemoteDescription(new RTCSessionDescription(remoteDescription))
+  //     .then(() => {
+  //       console.log("Remote Description Set");
+  //     })
+  //     .catch((err) => {
+  //       console.log(err);
+  //     });
+  // };
+
+  // const addCandidate = async () => {
+  //   candiates.current.forEach((candidate) => {
+  //     peer.current.addIceCandidate(new RTCIceCandidate(candidate));
+  //   });
+  // };
+
+  const handleSDP = (sdp) => {
+    peer.current.setLocalDescription(sdp);
+    socket.emit("sdp", { sdp });
+
+    sendToPeer("sdp", sdp);
   };
 
-  const addCandidate = async () => {
-    candiates.current.forEach((candidate) => {
-      peer.current.addIceCandidate(new RTCIceCandidate(candidate));
-    });
+  const sendToPeer = (eventType, payload) => {
+    socket.emit(eventType, payload);
   };
 
   useEffect(() => {
@@ -94,11 +101,13 @@ function App() {
     });
 
     socket.on("sdp", (data) => {
-      textAreaRef.current.value = JSON.stringify(data.sdp);
+      peer.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
+      textAreaRef.current.value = JSON.stringify(data.sdp, null, 2);
     });
 
     socket.on("candidate", (candidate) => {
-      candiates.current = [...candiates.current, candidate];
+      // candiates.current = [...candiates.current, candidate];
+      peer.current.addIceCandidate(new RTCIceCandidate(candidate));
     });
 
     const peerConnection = new RTCPeerConnection();
@@ -189,10 +198,10 @@ function App() {
           <Button onClick={createOffer}>Create Offer</Button>
           <Button onClick={createAnswer}>Create Answer</Button>
         </HStack>
-        <HStack pb={16}>
+        {/* <HStack pb={16}>
           <Button onClick={addCandidate}>Add Candidates</Button>
           <Button onClick={setRemoteDescription}>Set Remote Description</Button>
-        </HStack>
+        </HStack> */}
       </VStack>
     </Center>
   );
