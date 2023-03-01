@@ -1,5 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { Button, Center, Text, VStack, HStack, Input } from "@chakra-ui/react";
+import io from "socket.io-client";
+
+const socket = io("ws://localhost:8080", {
+  transports: ["websocket"],
+});
 
 /**
  * We're doing manual signaling just to keep things simple.
@@ -12,6 +17,7 @@ function App() {
   const videoStream = useRef(null);
   const remoteStream = useRef(null);
   const peer = useRef(null);
+  const candiates = useRef([]);
 
   const textAreaRef = useRef(null);
 
@@ -35,35 +41,33 @@ function App() {
   // };
 
   const createOffer = async () => {
-    peer.current
-      .createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: true,
-      })
-      .then((offer) => {
-        // Offer is an object that contains the SDP (Session Description Protocol) data.
-        console.log(JSON.stringify(offer));
-        peer.current.setLocalDescription(offer);
-      })
-      .catch((err) => {
-        console.log(err);
-      });
+    let config = {
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: true,
+    };
+    try {
+      let sdp = await peer.current.createOffer(config);
+      peer.current.setLocalDescription(sdp);
+
+      socket.emit("sdp", { sdp });
+    } catch (err) {
+      console.log(err);
+    }
   };
 
   const createAnswer = async () => {
-    peer.current
-      .createAnswer({
-        offerToReceiveAudio: false,
-        offerToReceiveVideo: true,
-      })
-      .then((answer) => {
-        // Answer is an object that contains the SDP (Session Description Protocol) data.
-        console.log(JSON.stringify(answer));
-        peer.current.setLocalDescription(answer);
-      })
-      .catch((err) => {
-        console.log(err);
-      });
+    let config = {
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: true,
+    };
+    try {
+      let sdp = await peer.current.createAnswer(config);
+      peer.current.setLocalDescription(sdp);
+
+      socket.emit("sdp", { sdp });
+    } catch (err) {
+      console.log(err);
+    }
   };
 
   const setRemoteDescription = async () => {
@@ -79,19 +83,24 @@ function App() {
   };
 
   const addCandidate = async () => {
-    const candidate = JSON.parse(textAreaRef.current.value);
-    peer.current
-      .addIceCandidate(new RTCIceCandidate(candidate))
-      .then(() => {
-        console.log("Candidate Added");
-      })
-      .catch((err) => {
-        console.log(err);
-      });
+    candiates.current.forEach((candidate) => {
+      peer.current.addIceCandidate(new RTCIceCandidate(candidate));
+    });
   };
 
   useEffect(() => {
-    // getAccess();
+    socket.on("connection", (data) => {
+      console.log("Connected to server");
+    });
+
+    socket.on("sdp", (data) => {
+      textAreaRef.current.value = JSON.stringify(data.sdp);
+    });
+
+    socket.on("candidate", (candidate) => {
+      candiates.current = [...candiates.current, candidate];
+    });
+
     const peerConnection = new RTCPeerConnection();
 
     navigator.mediaDevices
@@ -108,13 +117,11 @@ function App() {
 
     peerConnection.onicecandidate = (e) => {
       if (e.candidate) {
-        // When we get an ICE candidate from the remote peer, we need to send it to the remote peer.
-        console.log(JSON.stringify(e.candidate));
+        socket.emit("candidate", e.candidate);
       }
     };
 
     peerConnection.ontrack = (e) => {
-      // When we get a track from the remote peer, we need to add it to the video element.
       remoteStream.current.srcObject = e.streams[0];
     };
 
